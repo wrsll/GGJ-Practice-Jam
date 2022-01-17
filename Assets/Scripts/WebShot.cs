@@ -95,7 +95,7 @@ public class WebShot : MonoBehaviour
         webDistance += shootSpeed * Time.deltaTime;
         Vector2 shotPointDistance = Vector2.Lerp(transform.position, pointOfConnection, webDistance / 10);
 
-        if (Vector2.Distance(shotPointDistance, pointOfConnection) > .5f)
+        if (Vector2.Distance(shotPointDistance, pointOfConnection) > 1f)
         {
             webLine.SetPosition(0, transform.position);
             webLine.SetPosition(1, shotPointDistance);
