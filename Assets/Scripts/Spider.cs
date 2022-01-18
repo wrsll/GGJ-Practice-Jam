@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class WebShot : MonoBehaviour
+public class Spider : MonoBehaviour
 {
     [SerializeField] LayerMask ShootableMask;
 
@@ -14,10 +14,11 @@ public class WebShot : MonoBehaviour
     [SerializeField] float shootSpeed = 20f;
 
     private float webDistance;
+    private Platform target;
 
     bool isShooting = false;
-    bool shotIsConnected = false;
-    bool shotIsRetracting = false;
+    bool isShotConnected = false;
+    bool isShotRetracting = false;
 
     private Vector2 lookDirection;
     private Vector3 pointOfConnection;
@@ -49,7 +50,7 @@ public class WebShot : MonoBehaviour
         lookDirection = Camera.main.ScreenToWorldPoint(Input.mousePosition) - transform.position;
         Debug.DrawLine(transform.position, lookDirection);
 
-        if (Input.GetMouseButtonDown(0) && shotIsConnected)
+        if (isShotConnected && (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)))
         {
             StopShooting();
         }
@@ -59,13 +60,13 @@ public class WebShot : MonoBehaviour
             CheckForCollision();
         }
 
-        if (isShooting && !shotIsConnected)
+        if (isShooting && !isShotConnected)
         {
             //moveTime += Time.deltaTime;
             ShootWeb();
         }
 
-        if (shotIsRetracting)
+        if (isShotRetracting)
         {
             RetractWeb();
         }
@@ -87,6 +88,14 @@ public class WebShot : MonoBehaviour
             webLine.SetPosition(1, transform.position);
             webLine.enabled = true;
             pointOfConnection = hit.point;
+
+            Platform platform = hit.collider.gameObject.GetComponentInParent<Platform>();
+
+            if (platform)
+            {
+                target = platform;
+                target.SetIsGrappled(true);
+            }
         }
     }
 
@@ -102,8 +111,8 @@ public class WebShot : MonoBehaviour
         }
         else
         {
-            shotIsConnected = true;
-            shotIsRetracting = true;
+            isShotConnected = true;
+            isShotRetracting = true;
 
             webLine.SetPosition(1, pointOfConnection);
             webJoints.connectedAnchor = pointOfConnection;
@@ -115,10 +124,10 @@ public class WebShot : MonoBehaviour
     {
         float distance = Vector2.Distance(transform.position, pointOfConnection);
 
-        //Distance where the web strops retracting
+        //Distance where the web stops retracting
         if (distance >= 1.5f)
         {
-            shotPosDistance = Vector2.Lerp(transform.position, pointOfConnection, movementSpeed * Time.deltaTime);
+            shotPosDistance = Vector2.Lerp(transform.position, pointOfConnection, movementSpeed * Time.fixedDeltaTime);
             transform.position = shotPosDistance;
         }
 
@@ -129,12 +138,18 @@ public class WebShot : MonoBehaviour
     private void StopShooting()
     {
         isShooting = false;
-        shotIsConnected = false;
-        shotIsRetracting = false;
+        isShotConnected = false;
+        isShotRetracting = false;
 
         webLine.enabled = false;
         webJoints.enabled = false;
         moveTime = 0;
+
+        if(target != null)
+        {
+            target.SetIsGrappled(false);
+            target = null;
+        }
     }
 
     private void DrawShotWeb()
@@ -148,5 +163,15 @@ public class WebShot : MonoBehaviour
 
             webLine.SetPosition(i, currentPosition);
         }
+    }
+
+    public Vector2 GetPlayerPos()
+    {
+        return transform.position;
+    }
+
+    public bool IsShooting()
+    {
+        return isShooting;
     }
 }
