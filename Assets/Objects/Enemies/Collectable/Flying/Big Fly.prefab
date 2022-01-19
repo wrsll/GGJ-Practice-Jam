@@ -130,6 +130,7 @@ MonoBehaviour:
   waveFrequency: 7.5
   canCutWeb: 0
   walksOnPlatform: 0
+  ignoresPlatforms: 1
 --- !u!61 &6352734028278902339
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -140,7 +141,7 @@ BoxCollider2D:
   m_Enabled: 1
   m_Density: 1
   m_Material: {fileID: 0}
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_UsedByEffector: 0
   m_UsedByComposite: 0
   m_Offset: {x: 0.045235693, y: -0.016449317}

@@ -21,7 +21,6 @@ public class Enemy : MonoBehaviour
     [SerializeField] bool walksOnPlatform = false;
     [SerializeField] bool ignoresPlatforms = false;
 
-
     Vector3 enemyPos;
 
     private void Start()

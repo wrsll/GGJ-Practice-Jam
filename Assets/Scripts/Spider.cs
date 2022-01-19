@@ -27,7 +27,6 @@ public class Spider : MonoBehaviour
     float timer = 1.5f;
     float timerStart = 1.5f;
 
-
     private float webDistance;
     private Platform target;
 
@@ -36,9 +35,10 @@ public class Spider : MonoBehaviour
     bool isInvincible = false;
     bool autoRetracting = true;
 
+    bool isGameOver = false;
+
     private float horizontalInputs;
     private float verticalInputs;
-
 
     float shotDistance = 0f;
 
@@ -46,14 +46,41 @@ public class Spider : MonoBehaviour
     private Vector3 pointOfConnection;
     private Vector3 shotPosDistance;
 
+    SoundManager sm;
+
     void Start()
     {
         webJoints.enabled = false;
         webLine.enabled = false;
         webLineCollider.enabled = false;
+        sm = FindObjectOfType<SoundManager>();
+        sm.PlayGamePlayMusic();
+        Cursor.visible = false;
     }
 
-    void Update()
+    private void Update()
+    {
+        if(!isGameOver)
+        {
+            GetInputs();
+        }
+        else 
+        {
+            if(Crosshair.activeInHierarchy)
+            {
+                Cursor.visible = true;
+                Crosshair.SetActive(false);
+            }
+
+            if(gameObject.transform.position.y <  pointOfConnection.y - 10f)
+            {
+                spiderRB.gravityScale = 0;
+                spiderRB.velocity = Vector3.zero;
+            }
+        }
+    }
+
+    void GetInputs()
     {
         mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
@@ -78,8 +105,8 @@ public class Spider : MonoBehaviour
             {
                 if (!Crosshair.activeInHierarchy)
                 {
-                    Crosshair.SetActive(true);
                     Cursor.visible = false;
+                    Crosshair.SetActive(true);
                 }
                 mousePos.z += Camera.main.nearClipPlane;
                 Crosshair.transform.position = mousePos;
@@ -180,6 +207,8 @@ public class Spider : MonoBehaviour
                 target = platform;
                 target.SetIsGrappled(true);
             }
+
+            sm.PlayShootSound();
         }
     }
 
@@ -252,7 +281,7 @@ public class Spider : MonoBehaviour
         //Distance where the web stops descending
         if (shotDistance < maxShotDistance / 2)
         {
-            shotPosDistance = new Vector2(transform.position.x, transform.position.y - (retractionSpeed + retractionSpeed) * Time.fixedDeltaTime);
+            shotPosDistance = new Vector2(transform.position.x, transform.position.y -  retractionSpeed * Time.fixedDeltaTime);
             transform.position = shotPosDistance;
         }
     }
@@ -296,17 +325,20 @@ public class Spider : MonoBehaviour
 
     public void CutWeb()
     {
+        sm.PlayCutSound();
         StopShooting();
     }
 
     public void AddNewShot(int shotCount = 1)
     {
         shotsLeft += shotCount;
+        sm.PlayCollectSound();
     }
 
     public void SetShotsLeft(int shotCount = 3)
     {
         shotsLeft = shotCount;
+        sm.PlayMushroomSound();
     }
 
     public int GetShotsLeft()
@@ -317,10 +349,18 @@ public class Spider : MonoBehaviour
     public void SetInvincible()
     {
         isInvincible = true;
+        sm.PlayBounceSound();
     }
 
     public bool IsInvincible()
     {
         return isInvincible;
+    }
+
+    public void SetGameOver()
+    {
+        CutWeb();
+        pointOfConnection = transform.position;
+        isGameOver = true;
     }
 }
