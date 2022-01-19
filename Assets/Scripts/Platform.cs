@@ -5,6 +5,7 @@ using UnityEngine;
 public class Platform : MonoBehaviour
 {
     Spider spider;
+    GameManager gm;
     [SerializeField] GameObject CollisionLine;
     [SerializeField] GameObject WebShotLine;
 
@@ -14,20 +15,25 @@ public class Platform : MonoBehaviour
     private void Start()
     {
         spider = FindObjectOfType<Spider>();
+        gm = FindObjectOfType<GameManager>();
     }
 
     private void Update()
     {
         if (!isDangerous)
         {
-            if (spider.GetPlayerPos().y <= gameObject.transform.position.y)
+            if (spider.GetPlayerPosY() >= gameObject.transform.position.y - 2f)
             {
                 CollisionLine.SetActive(true);
+            }
+            else
+            {
+                CollisionLine.SetActive(false);
             }
         }
         else
         {
-            if (!isGrappled && !spider.IsShooting())
+            if (!isGrappled && !spider.IsShooting() && !spider.IsInvincible())
             {
                 if (spider.GetPlayerPos().y <= gameObject.transform.position.y)
                 {

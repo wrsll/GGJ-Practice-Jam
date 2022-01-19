@@ -4,75 +4,155 @@ using UnityEngine;
 
 public class Spider : MonoBehaviour
 {
+    [Header("References:")]
     [SerializeField] LayerMask ShootableMask;
 
+    [SerializeField] GameObject Crosshair;
+    Vector3 mousePos;
+
+    private List<Vector2> lineColliderPoints;
+    [SerializeField] PolygonCollider2D webLineCollider;
     [SerializeField] LineRenderer webLine;
     [SerializeField] SpringJoint2D webJoints;
+    [SerializeField] Rigidbody2D spiderRB;
 
+    [Header("Webshot Settings:")]
     [SerializeField] float maxShotDistance = 10f;
-    [SerializeField] float movementSpeed = 10f;
     [SerializeField] float shootSpeed = 20f;
+    [SerializeField] float retractionSpeed = 2f;
+    [SerializeField] float swingForce = 5f;
+
+    [SerializeField] int shotsLeft = 5;
+
+    float timer = 1.5f;
+    float timerStart = 1.5f;
+
 
     private float webDistance;
     private Platform target;
 
     bool isShooting = false;
     bool isShotConnected = false;
-    bool isShotRetracting = false;
+    bool isInvincible = false;
+    bool autoRetracting = true;
+
+    private float horizontalInputs;
+    private float verticalInputs;
+
+
+    float shotDistance = 0f;
 
     private Vector2 lookDirection;
     private Vector3 pointOfConnection;
     private Vector3 shotPosDistance;
 
-    [Header("Unfinished:")]
-    [SerializeField] float webLinePoints = 60;
-
-    [Header("Animation Settings:")]
-    public AnimationCurve animationCurve;
-    [Range(0.01f, 4)] [SerializeField] private float StartWaveSize = 2;
-    float waveSize = 0;
-
-    [Header("Animation Progression:")]
-    public AnimationCurve progressionCurve;
-    [SerializeField] [Range(1, 50)] private float progressionSpeed = 1;
-
-    float moveTime = 0;
-
     void Start()
     {
         webJoints.enabled = false;
         webLine.enabled = false;
+        webLineCollider.enabled = false;
     }
 
     void Update()
     {
+        mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+
         //Get the location of where the player clicked on the screen & subtract it by the player's position to get the distance between the two.
-        lookDirection = Camera.main.ScreenToWorldPoint(Input.mousePosition) - transform.position;
+        lookDirection = mousePos - transform.position;
         Debug.DrawLine(transform.position, lookDirection);
+
+        if(isInvincible)
+        {
+            timer -= Time.deltaTime;
+
+            if(timer < 0 || isShooting)
+            {
+                isInvincible = false;
+                timer = timerStart;
+            }
+        }
+
+        if (shotsLeft > 0)
+        {
+            if (Vector2.Distance(transform.position, mousePos) < maxShotDistance)
+            {
+                if (!Crosshair.activeInHierarchy)
+                {
+                    Crosshair.SetActive(true);
+                    Cursor.visible = false;
+                }
+                mousePos.z += Camera.main.nearClipPlane;
+                Crosshair.transform.position = mousePos;
+            }
+            else if (Crosshair.activeInHierarchy)
+            {
+                Cursor.visible = true;
+                Crosshair.SetActive(false);
+            }
+        }
+
+        horizontalInputs = Input.GetAxisRaw("Horizontal");
+        verticalInputs = Input.GetAxisRaw("Vertical");
 
         if (isShotConnected && (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)))
         {
             StopShooting();
         }
 
-        if (Input.GetMouseButtonDown(0) && !isShooting)
+        if (Input.GetMouseButtonDown(0) && !isShooting && shotsLeft > 0)
         {
             CheckForCollision();
         }
 
-        if (isShooting && !isShotConnected)
+        if (isShooting)
         {
-            //moveTime += Time.deltaTime;
-            ShootWeb();
-        }
+            if (!isShotConnected)
+            {
+                ShootWeb();
+            }
 
-        if (isShotRetracting)
-        {
-            RetractWeb();
+            if (isShotConnected)
+            {
+                shotDistance = Vector2.Distance(transform.position, pointOfConnection);
+
+                if (verticalInputs > 0.1f || verticalInputs < -0.1f)
+                {
+                    if(autoRetracting)
+                    {
+                        autoRetracting = false;
+                    }
+
+                    if(verticalInputs > 0.1f)
+                    {
+                        RetractWeb();
+                    }
+                    else
+                    {
+                        DescendWeb();
+                    }
+                }
+                else if(autoRetracting)
+                {
+                    RetractWeb();
+                }
+
+                webJoints.distance = shotDistance;
+                webLine.SetPosition(0, transform.position);
+            }
+
+            lineColliderPoints = CalculateWebLinePoints();
+            webLineCollider.SetPath(0, lineColliderPoints.ConvertAll(p => (Vector2)transform.InverseTransformPoint(p)));
         }
     }
 
-
+    private void FixedUpdate()
+    {
+        if(isShotConnected)
+        {
+            Vector2 swingInputs = new Vector2(horizontalInputs * swingForce * Time.fixedDeltaTime, 0f);
+            spiderRB.AddForce(swingInputs);
+        }
+    }
 
     private void CheckForCollision()
     {
@@ -82,11 +162,15 @@ public class Spider : MonoBehaviour
         if (hit.collider != null)
         {
             isShooting = true;
+            shotsLeft--;
 
             webDistance = 0;
             webLine.SetPosition(0, transform.position);
             webLine.SetPosition(1, transform.position);
             webLine.enabled = true;
+
+            webLineCollider.enabled = true;
+
             pointOfConnection = hit.point;
 
             Platform platform = hit.collider.gameObject.GetComponentInParent<Platform>();
@@ -112,7 +196,7 @@ public class Spider : MonoBehaviour
         else
         {
             isShotConnected = true;
-            isShotRetracting = true;
+            autoRetracting = true;
 
             webLine.SetPosition(1, pointOfConnection);
             webJoints.connectedAnchor = pointOfConnection;
@@ -120,30 +204,68 @@ public class Spider : MonoBehaviour
         }
     }
 
+    private Vector3[] GetWebLinePositions()
+    {
+        Vector3[] webLinePositions = new Vector3[webLine.positionCount];
+        webLine.GetPositions(webLinePositions);
+        return webLinePositions;
+    }
+
+    private List<Vector2> CalculateWebLinePoints()
+    {
+        Vector3[] linePositions = GetWebLinePositions();
+        float width = webLine.startWidth;
+
+        float m = ((linePositions[1].y - linePositions[0].y) / (linePositions[1].x - linePositions[0].x));
+        float deltaX = (width / 2f) * (m / Mathf.Pow(m * m + 1, 0.5f));
+        float deltaY = (width / 2f) * (1 / Mathf.Pow(m * m + 1, 0.5f));
+
+        Vector3[] offsets = new Vector3[2];
+        offsets[0] = new Vector3(-deltaX, deltaY);
+        offsets[1] = new Vector3(deltaX, -deltaY);
+
+
+        List<Vector2> colliderPoints = new List<Vector2>
+        {
+            linePositions[0] + offsets[0],
+            linePositions[1] + offsets[0],
+            linePositions[1] + offsets[1],
+            linePositions[0] + offsets[1],
+        };
+
+        return colliderPoints;
+    }
+
+
     private void RetractWeb()
     {
-        float distance = Vector2.Distance(transform.position, pointOfConnection);
-
         //Distance where the web stops retracting
-        if (distance >= 1.5f)
+        if (shotDistance >= 1.5f)
         {
-            shotPosDistance = Vector2.Lerp(transform.position, pointOfConnection, movementSpeed * Time.fixedDeltaTime);
+            shotPosDistance = Vector2.Lerp(transform.position, pointOfConnection, retractionSpeed * Time.fixedDeltaTime);
             transform.position = shotPosDistance;
         }
+    }
 
-        webJoints.distance = distance;
-        webLine.SetPosition(0, transform.position);
+    private void DescendWeb()
+    {
+        //Distance where the web stops descending
+        if (shotDistance < maxShotDistance / 2)
+        {
+            shotPosDistance = new Vector2(transform.position.x, transform.position.y - (retractionSpeed + retractionSpeed) * Time.fixedDeltaTime);
+            transform.position = shotPosDistance;
+        }
     }
 
     private void StopShooting()
     {
         isShooting = false;
         isShotConnected = false;
-        isShotRetracting = false;
+        autoRetracting = true;
 
         webLine.enabled = false;
         webJoints.enabled = false;
-        moveTime = 0;
+        webLineCollider.enabled = false;
 
         if(target != null)
         {
@@ -152,26 +274,53 @@ public class Spider : MonoBehaviour
         }
     }
 
-    private void DrawShotWeb()
-    {
-        for (int i = 0; i < webLinePoints; i++)
-        {
-            float delta = (float)i / ((float)webLinePoints - 1f);
-            Vector2 offset = Vector2.Perpendicular(shotPosDistance).normalized * animationCurve.Evaluate(delta) * waveSize;
-            Vector2 targetPosition = Vector2.Lerp(transform.position, pointOfConnection, delta) + offset;
-            Vector2 currentPosition = Vector2.Lerp(transform.position, targetPosition, progressionCurve.Evaluate(moveTime) * progressionSpeed);
-
-            webLine.SetPosition(i, currentPosition);
-        }
-    }
-
     public Vector2 GetPlayerPos()
     {
         return transform.position;
     }
 
+    public float GetPlayerPosY()
+    {
+        return transform.position.y;
+    }
+
     public bool IsShooting()
     {
         return isShooting;
+    }
+
+    public bool IsShotConnected()
+    {
+        return isShotConnected;
+    }
+
+    public void CutWeb()
+    {
+        StopShooting();
+    }
+
+    public void AddNewShot(int shotCount = 1)
+    {
+        shotsLeft += shotCount;
+    }
+
+    public void SetShotsLeft(int shotCount = 3)
+    {
+        shotsLeft = shotCount;
+    }
+
+    public int GetShotsLeft()
+    {
+        return shotsLeft;
+    }
+
+    public void SetInvincible()
+    {
+        isInvincible = true;
+    }
+
+    public bool IsInvincible()
+    {
+        return isInvincible;
     }
 }

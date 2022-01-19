@@ -1,15 +1,24 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 public class CollisionCheck : MonoBehaviour
 {
+    GameManager gm;
+
     private bool isDangerous = true;
+
+    private MushroomEffect effect = null;
 
     private void Start()
     {
+        gm = FindObjectOfType<GameManager>();
         isDangerous = gameObject.GetComponentInParent<Platform>().IsDangerous();
+
+        if(!isDangerous)
+        {
+            effect = gameObject.GetComponentInParent<MushroomEffect>();
+        }
     }
 
     private void OnTriggerEnter2D(Collider2D other)
@@ -18,19 +27,11 @@ public class CollisionCheck : MonoBehaviour
         {
             if(isDangerous)
             {
-                Rigidbody2D rb = other.gameObject.GetComponent<Rigidbody2D>();
-                rb.velocity = Vector2.zero;
-                rb.angularVelocity = 0f;
-
-                string currentSceneName = SceneManager.GetActiveScene().name;
-                SceneManager.LoadScene(currentSceneName);
-
-                //rb.gravityScale = 0;
+                gm.GameOver();
             }
             else
             {
-                Debug.Log("yipee!");
-                //Recover web?
+                effect.UseEffect();
             }
         }
     }
